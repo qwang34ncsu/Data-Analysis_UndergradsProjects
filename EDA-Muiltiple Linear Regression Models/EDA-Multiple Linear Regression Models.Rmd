@@ -1,0 +1,143 @@
+---
+title: "EDA-Multiple Linear Regression Models"
+author: "Harper Wang"
+date: "4/30/2022"
+output: html_document
+---
+
+
+```{r}
+# install packages for running code.
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(readxl)
+library(tinytex)
+library(tibble)
+library("GGally")
+library(ggplot2)
+library(psych)
+
+# Add a new section which is variables' name to original data
+cols <- c("CIC0","SM1_Dz(Z)","GATS1i","NdsCH","NdssC","MLOGP","LC50 [-LOG(mol/L)]")
+fish <- read_delim("/Users/auntbreakfast/Desktop/NSCU Undergrads/ST308/qsar_fish_toxicity.csv", col_names = cols, na = c('.','NA'))
+```
+## EDA
+
+## provide a ‘pairs’ style plot using the GGally package
+```{r}
+ggpairs(fish)
+```
+## have numeric summaries of the LC50 variable (at different levels/combinations of other variables)
+```{r}
+summary <- fish %>%
+  group_by(GATS1i,CIC0)%>%
+  summarise(minimum = min(`LC50 [-LOG(mol/L)]`),
+          mean = mean(`LC50 [-LOG(mol/L)]`),
+          median = median(`LC50 [-LOG(mol/L)]`),
+          maximun = max(`LC50 [-LOG(mol/L)]`))
+summary
+```
+
+## Plotting
+1. The first plot is a scatter plot with a regression line. Which shows LC50 changes in diffrent CIC0 values.
+```{r}
+g <- ggplot(fish, aes(x = `LC50 [-LOG(mol/L)]`, y = CIC0))
+g + geom_point() +geom_smooth(formula = y ~ x, method = "lm", se = FALSE)+
+  labs(title = "LC50 [-LOG(mol/L)] changes in Different CIC0 values", x ="LC50[-LOG(mol/L)] value", y = "CIC0 value") + theme(plot.title = element_text(hjust = 0.5))
+```
+2. The second plot is a violin plot. Which shows NdsCH values by LC50 [-LOG(mol/L)] value.
+```{r}
+g <- ggplot(fish, aes(x = `LC50 [-LOG(mol/L)]`,y = NdsCH))
+g + geom_violin(fill = "pink") + labs(title = "Plot of NdsCH values by LC50 [-LOG(mol/L)] value", x ="LC50 [-LOG(mol/L)]", y = "NdsCH value") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+3. The third plot is a histogram. Which shows the distribution of LC50 in different NdssC values.
+```{r}
+g <- ggplot(data = fish, aes(x = `LC50 [-LOG(mol/L)]`))
+g + geom_density(adjust = 0.5, alpha = 0.5, aes(fill = NdssC)) + labs(title = "Distribution of LC50 in different NdssC Values", x ="LC50 [-LOG(mol/L)] value", y = "NdssC Value") + theme(plot.title = element_text(hjust = 0.5))
+```
+3. The fourth plot is a scatter plot. Which shows the relationship between SM1_Dz(Z) values and LC50 [-LOG(mol/L)] value.
+```{r}
+g <- ggplot(data = fish, aes(x = `LC50 [-LOG(mol/L)]`, y = `SM1_Dz(Z)`))
+g + geom_point(size = 1.5) + geom_smooth(formula = y ~ x,method = lm) + labs(x = "LC50 [-LOG(mol/L)]", title = "relationship between LC50 value and SM1_Dz(Z) value")
+```
+
+
+## Investigate relationships between the variables in terms of their medians. 
+
+Use the apply() function to apply this function to each column of the data frame
+```{r}
+medianfish <- function(x) {
+  ifelse (x <= median(x), "low", "High")
+}
+fishMedian <- apply(X = fish %>% select(everything()), 
+             MARGIN = 2,
+             FUN = medianfish
+             )
+```
+
+Create a two-way contingency table with corresponding side-by- side/stacked bar plot visual using the binary LC50 variable and CIC0 variable.
+
+```{r}
+fishnew <- as.data.frame(fishMedian)
+table(fishnew$`LC50 [-LOG(mol/L)]`,fishnew$CIC0)
+
+ggplot(data = fishnew, aes(x = `LC50 [-LOG(mol/L)]`, fill = CIC0)) + geom_bar(position = "dodge") + labs(title = "Bar plot with LC50 and CIC0")
+```
+Create a two-way contingency table with corresponding side-by- side/stacked bar plot visual using the binary LC50 variable and NdsCH variable.
+
+```{r}
+fishnew <- as.data.frame(fishMedian)
+table(fishnew$`LC50 [-LOG(mol/L)]`,fishnew$NdsCH)
+
+ggplot(data = fishnew, aes(x = `LC50 [-LOG(mol/L)]`, fill = NdsCH)) + geom_bar(position = "dodge")+ labs(title = "Bar plot with LC50 and NdsCH")
+```
+
+##Fit four different linear regression models. - At least one model should include a polynomial term - At least one model should include an interaction term
+
+1. The first linear regression model.
+```{r}
+mod1 <- lm(`LC50 [-LOG(mol/L)]` ~ CIC0, data = fish)
+summary(mod1)
+```
+
+2. The second linear regression model.
+```{r}
+mod2 <- lm(`LC50 [-LOG(mol/L)]`~ CIC0 + NdsCH + MLOGP +GATS1i, data = fish)
+summary(mod2)
+```
+
+3. The third linear regression model.
+```{r}
+mod3 <- lm(`LC50 [-LOG(mol/L)]`~ CIC0 + NdsCH + MLOGP +GATS1i:NdsCH, data = fish)
+summary(mod3)
+```
+
+4. The fourth linear regression model.
+```{r}
+mod4 <- lm(`LC50 [-LOG(mol/L)]`~ CIC0 + NdsCH + MLOGP +GATS1i:NdsCH, data = fish)
+summary(mod4)
+```
+
+5. Use mod4 to build a mutiple linear regression which include LC50, CIC0,NDsCH, MLOGP, GATS1i and polynomial term which is CIC0^2.
+
+```{r}
+mod4 <- lm(`LC50 [-LOG(mol/L)]`~ CIC0 + NdsCH + MLOGP +GATS1i+I(CIC0^2), data = fish)
+summary(mod4)
+```
+6. Choose mod4 as a final model, and display the diagnostic plots.
+comments: We can see in the Normal Q-Q plot, points are made up to a straight line which can shows that this model meet the linear regression assumption. Also the P-value of mod 4 is less than 0.05 which is reject the null hypothesis.
+```{r}
+par(mfrow = c(2,2))
+plot(mod4)
+```
+##Predicting LC50 value
+use mod1 to predict LC50 value.
+```{r}
+predict(mod1, newmod = data.frame(CIC0 = median(fish$CIC0)))
+```
+use mod2 to predict LC50 value.
+```{r}
+predict(mod2, newmod = data.frame(CIC0 = median(fish$CIC0), NdsCH = median(fish$NdsCH), MLOGP = median(fish$MLOGP), GATS1i=median(fish$GATS1i)))
+```
